@@ -25,10 +25,16 @@ message StreamConnect {
 	bool active = 3;
 }
 
+message Room {
+	string room_key = 1;
+	string type =2;
+}
+
 message Empty{}
 
 service ChatService {
 	rpc RegisterUser(User) returns (RegisterResponse);
 	rpc CreateStreamMessage(StreamConnect) returns (stream ContentMessage);
 	rpc SendMessage(ContentMessage) returns (Empty);
+	rpc CreateRoom(Room) returns (Empty);
 }

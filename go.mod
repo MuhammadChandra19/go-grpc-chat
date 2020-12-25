@@ -2,4 +2,8 @@ module github.com/MuhammadChandra19/go-grpc-chat
 
 go 1.14
 
-require github.com/jmoiron/sqlx v1.2.0
+require (
+	github.com/jmoiron/sqlx v1.2.0
+	google.golang.org/grpc v1.34.0
+	google.golang.org/protobuf v1.25.0
+)
