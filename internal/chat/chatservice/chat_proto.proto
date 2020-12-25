@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package chatservice;
+
+message User {
+	string email = 1;
+	string name = 2;
+}
+
+message RegisterResponse {
+	User result = 1;
+}
+
+message ContentMessage {
+	string room_key = 1;
+	string email = 2;
+	string content = 3;
+	string type = 4;
+	
+}
+
+message StreamConnect {
+	string name = 1;
+	string room_key = 2;
+	bool active = 3;
+}
+
+message Empty{}
+
+service ChatService {
+	rpc RegisterUser(User) returns (RegisterResponse);
+	rpc CreateStreamMessage(StreamConnect) returns (stream ContentMessage);
+	rpc SendMessage(ContentMessage) returns (Empty);
+}
