@@ -10,7 +10,7 @@ import (
 
 type service struct {
 	repository  RepositoryInterface
-	Connnection []*Connection
+	Connnection map[string]*Connection
 }
 
 type PayloadInsertUser struct {
@@ -85,16 +85,10 @@ func (s *service) CreateStreamMessage(connect *chatservice.StreamConnect, stream
 		active:  true,
 		error:   make(chan error),
 	}
-	n := 0
-	for _, x := range s.Connnection {
-		if x.id != connect.GetName() {
-			s.Connnection[n] = x
-			n++
-		}
-	}
-	s.Connnection = s.Connnection[:n]
 
-	s.Connnection = append(s.Connnection, conn)
+	if _, ok := s.Connnection[connect.GetName()]; !ok {
+		s.Connnection[connect.GetName()] = conn
+	}
 
 	return <-conn.error
 
