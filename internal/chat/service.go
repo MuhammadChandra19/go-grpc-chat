@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/MuhammadChandra19/go-grpc-chat/internal/chat/chatservice"
-	"sync"
 	"time"
 )
 
 type service struct {
 	repository  RepositoryInterface
-	Connnection []*Connection
+	Connnection map[string]*Connection
 }
 
 type PayloadInsertUser struct {
@@ -85,45 +84,29 @@ func (s *service) CreateStreamMessage(connect *chatservice.StreamConnect, stream
 		active:  true,
 		error:   make(chan error),
 	}
-	n := 0
-	for _, x := range s.Connnection {
-		if x.id != connect.GetName() {
-			s.Connnection[n] = x
-			n++
-		}
-	}
-	s.Connnection = s.Connnection[:n]
-
-	s.Connnection = append(s.Connnection, conn)
+	s.Connnection[connect.GetRoomKey()] = conn
 
 	return <-conn.error
-
 }
 
-func (s *service) SendMessage(ctx context.Context, req *chatservice.ContentMessage) (*chatservice.Empty, error) {
-	syncWait := sync.WaitGroup{}
+func (s *service) SendMessage(req *chatservice.ContentMessage) (*chatservice.Empty, error) {
 	finish := make(chan int)
 
-	for _, conn := range s.Connnection {
-		syncWait.Add(1)
-		go func(messageContent *chatservice.ContentMessage, conn *Connection) {
-			defer syncWait.Done()
-			if conn.active {
-				if req.RoomKey == conn.roomKey {
-					err := conn.stream.Send(messageContent)
-					fmt.Printf("Send Message to: %v\n", conn.stream)
-					if err != nil {
-						fmt.Printf("Error while streaming: %v\n", err)
-						conn.active = false
-						conn.error <- err
-					}
+	go func(messageContent *chatservice.ContentMessage, conn *Connection) {
+		if conn.active {
+			if req.RoomKey == conn.roomKey {
+				err := conn.stream.Send(messageContent)
+				fmt.Printf("Send Message to: %v\n", conn.stream)
+				if err != nil {
+					fmt.Printf("Error while streaming: %v\n", err)
+					conn.active = false
+					conn.error <- err
 				}
 			}
-		}(req, conn)
-	}
+		}
+	}(req, s.Connnection[req.RoomKey])
 
 	go func() {
-		syncWait.Wait()
 		close(finish)
 	}()
 
