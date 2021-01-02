@@ -13,6 +13,7 @@ import (
 	"github.com/MuhammadChandra19/go-grpc-chat/internal/errors"
 	"github.com/MuhammadChandra19/go-grpc-chat/internal/storage/postgres/migration"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 type database struct {

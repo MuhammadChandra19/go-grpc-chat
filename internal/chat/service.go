@@ -1,15 +1,16 @@
-package chatservice
+package chat
 
 import (
 	"context"
 	"fmt"
-	"github.com/MuhammadChandra19/go-grpc-chat/internal/chat/chatservice"
+	"github.com/MuhammadChandra19/go-grpc-chat/internal/chat/chatproto"
+	"sync"
 	"time"
 )
 
-type service struct {
-	repository  RepositoryInterface
-	Connnection map[string]*Connection
+type Service struct {
+	Repository  RepositoryInterface
+	Connnection []*Connection
 }
 
 type PayloadInsertUser struct {
@@ -18,7 +19,8 @@ type PayloadInsertUser struct {
 }
 
 type Connection struct {
-	stream  chatservice.ChatService_CreateStreamMessageServer
+	stream chatproto.ChatProto_CreateStreamMessageServer
+	// stream  chatproto.ChatService_CreateStreamMessageServer
 	id      string
 	roomKey string
 	active  bool
@@ -44,39 +46,60 @@ const (
 	RoomTypeBroadcast = "broadcast"
 )
 
-func (s *service) RegisterUser(ctx context.Context, payload PayloadInsertUser) error {
+func (s *Service) RegisterUser(ctx context.Context, req *chatproto.User) (*chatproto.RegisterResponse, error) {
 	modelUser := User{
-		Email: payload.Email,
-		Name:  payload.Name,
+		Email: req.Email,
+		Name:  req.Name,
 	}
 
-	err := s.repository.InsertUser(ctx, modelUser)
+	err := s.Repository.InsertUser(ctx, modelUser)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	registerRes := &chatproto.RegisterResponse{
+		Result: &chatproto.User{
+			Email: modelUser.Email,
+			Name:  modelUser.Name,
+		},
+	}
+
+	return registerRes, nil
 }
 
-func (s *service) CreateRoom(ctx context.Context, payload PayloadInsertRoom) error {
+func (s *Service) AddUserToRoom(ctx context.Context, req *chatproto.UserRoom) (*chatproto.Empty, error) {
+	roomUser := UserRoom{
+		RoomKey:   req.RoomKey,
+		UUID:      req.UUID,
+		UserEmail: req.UserEmail,
+	}
+	err := s.Repository.JoinRoom(ctx, roomUser)
+	if err != nil {
+		return nil, err
+	}
+
+	return &chatproto.Empty{}, nil
+}
+
+func (s *Service) CreateRoom(ctx context.Context, req *chatproto.Room) (*chatproto.Empty, error) {
 	now := time.Now()
 
 	modelRoom := Room{
-		RoomKey:   payload.RoomKey,
-		Type:      payload.Type,
-		CreatedBy: payload.CreatedBy,
+		RoomKey:   req.RoomKey,
+		Type:      req.Type,
+		CreatedBy: req.CreatedBy,
 		CreatedAt: &now,
 	}
 
-	err := s.repository.InsertRoom(ctx, modelRoom)
+	err := s.Repository.InsertRoom(ctx, modelRoom)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &chatproto.Empty{}, nil
 }
 
-func (s *service) CreateStreamMessage(connect *chatservice.StreamConnect, stream chatservice.ChatService_CreateStreamMessageServer) error {
+func (s *Service) CreateStreamMessage(connect *chatproto.StreamConnect, stream chatproto.ChatProto_CreateStreamMessageServer) error {
 	conn := &Connection{
 		stream:  stream,
 		id:      connect.GetName(),
@@ -84,32 +107,48 @@ func (s *service) CreateStreamMessage(connect *chatservice.StreamConnect, stream
 		active:  true,
 		error:   make(chan error),
 	}
-	s.Connnection[connect.GetRoomKey()] = conn
+	n := 0
+	for _, x := range s.Connnection {
+		if x.id != connect.GetName() && x.roomKey != connect.GetRoomKey() {
+			s.Connnection[n] = x
+			n++
+		}
+	}
+	s.Connnection = s.Connnection[:n]
+
+	s.Connnection = append(s.Connnection, conn)
 
 	return <-conn.error
+
 }
 
-func (s *service) SendMessage(req *chatservice.ContentMessage) (*chatservice.Empty, error) {
+func (s *Service) SendMessage(ctx context.Context, req *chatproto.ContentMessage) (*chatproto.Empty, error) {
+	syncWait := sync.WaitGroup{}
 	finish := make(chan int)
 
-	go func(messageContent *chatservice.ContentMessage, conn *Connection) {
-		if conn.active {
-			if req.RoomKey == conn.roomKey {
-				err := conn.stream.Send(messageContent)
-				fmt.Printf("Send Message to: %v\n", conn.stream)
-				if err != nil {
-					fmt.Printf("Error while streaming: %v\n", err)
-					conn.active = false
-					conn.error <- err
+	for _, conn := range s.Connnection {
+		syncWait.Add(1)
+		go func(messageContent *chatproto.ContentMessage, conn *Connection) {
+			defer syncWait.Done()
+			if conn.active {
+				if req.RoomKey == conn.roomKey {
+					err := conn.stream.Send(messageContent)
+					fmt.Printf("Send Message to: %v\n", conn.stream)
+					if err != nil {
+						fmt.Printf("Error while streaming: %v\n", err)
+						conn.active = false
+						conn.error <- err
+					}
 				}
 			}
-		}
-	}(req, s.Connnection[req.RoomKey])
+		}(req, conn)
+	}
 
 	go func() {
+		syncWait.Wait()
 		close(finish)
 	}()
 
 	<-finish
-	return &chatservice.Empty{}, nil
+	return &chatproto.Empty{}, nil
 }

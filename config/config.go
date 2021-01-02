@@ -31,7 +31,7 @@ func GetConfiguration() *Config {
 
 	config := &Config{
 		Port:         getEnvOrDefault(port, "8080"),
-		PostgresConn: getEnvOrDefault(postgresConn, "host=localhost port=5432 user=postgres password=test-grpc dbname=chat-grpc sslmode=disable"),
+		PostgresConn: getEnvOrDefault(postgresConn, "host=localhost port=5432 user=postgres password=postgres dbname=chatgrpc sslmode=disable"),
 	}
 
 	return config

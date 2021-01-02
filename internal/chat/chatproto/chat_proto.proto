@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package chatservice;
+package chatproto;
 
 message User {
 	string email = 1;
@@ -27,14 +27,22 @@ message StreamConnect {
 
 message Room {
 	string room_key = 1;
-	string type =2;
+	string type = 2;
+	string created_by = 3;
+}
+
+message UserRoom {
+	string UUID = 1;
+	string room_key = 2;
+	string user_email = 3;
 }
 
 message Empty{}
 
-service ChatService {
+service ChatProto {
 	rpc RegisterUser(User) returns (RegisterResponse);
 	rpc CreateStreamMessage(StreamConnect) returns (stream ContentMessage);
 	rpc SendMessage(ContentMessage) returns (Empty);
 	rpc CreateRoom(Room) returns (Empty);
+	rpc AddUserToRoom(UserRoom) returns (Empty);
 }

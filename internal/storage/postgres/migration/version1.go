@@ -1,6 +1,6 @@
 package migration
 
-var version1 = ` CREATE TYPE room_type AS ENUM ('private', 'public', 'broadcast);
+var version1 = `CREATE TYPE room_type AS ENUM ('private','public','broadcast');
 
 CREATE TABLE IF NOT EXISTS "misc" (
 	key VARCHAR (50) PRIMARY KEY,
@@ -11,20 +11,20 @@ CREATE TABLE IF NOT EXISTS "misc" (
 
 CREATE TABLE IF NOT EXISTS "user" (
 	email VARCHAR (50) PRIMARY KEY,
-	name VARCHAR (50) NOT NULL,
-)
+	name VARCHAR (50) NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS "room" (
 	room_key VARCHAR (50) PRIMARY KEY,
 	type room_type NOT NULL,
 	created_by VARCHAR (50) NOT NULL,
-	created_at timestamptz NULL,
+	created_at timestamptz NULL
 );
 
 CREATE TABLE IF NOT EXISTS "user_room" (
 	uuid VARCHAR (50) PRIMARY KEY,
 	user_email VARCHAR (50) NOT NULL,
-	room_key VARCHAR (50) NOT NULL,
+	room_key VARCHAR (50) NOT NULL
 );
 
 INSERT INTO public.misc ("key",value,created_at,updated_at) VALUES
