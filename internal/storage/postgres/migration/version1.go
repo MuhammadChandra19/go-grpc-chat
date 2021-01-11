@@ -9,11 +9,6 @@ CREATE TABLE IF NOT EXISTS "misc" (
 	updated_at timestamptz NULL
 );
 
-CREATE TABLE IF NOT EXISTS "user" (
-	email VARCHAR (50) PRIMARY KEY,
-	name VARCHAR (50) NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS "room" (
 	room_key VARCHAR (50) PRIMARY KEY,
 	type room_type NOT NULL,

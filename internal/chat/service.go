@@ -3,14 +3,14 @@ package chat
 import (
 	"context"
 	"fmt"
-	"github.com/MuhammadChandra19/go-grpc-chat/internal/chat/chatproto"
+	"github.com/MuhammadChandra19/go-grpc-chat/api/v1"
 	"sync"
 	"time"
 )
 
 type Service struct {
 	Repository  RepositoryInterface
-	Connnection []*Connection
+	Connnection map[string]*Connection
 }
 
 type PayloadInsertUser struct {
@@ -19,8 +19,7 @@ type PayloadInsertUser struct {
 }
 
 type Connection struct {
-	stream chatproto.ChatProto_CreateStreamMessageServer
-	// stream  chatproto.ChatService_CreateStreamMessageServer
+	stream  v1.ChatProto_CreateStreamServer
 	id      string
 	roomKey string
 	active  bool
@@ -46,28 +45,7 @@ const (
 	RoomTypeBroadcast = "broadcast"
 )
 
-func (s *Service) RegisterUser(ctx context.Context, req *chatproto.User) (*chatproto.RegisterResponse, error) {
-	modelUser := User{
-		Email: req.Email,
-		Name:  req.Name,
-	}
-
-	err := s.Repository.InsertUser(ctx, modelUser)
-	if err != nil {
-		return nil, err
-	}
-
-	registerRes := &chatproto.RegisterResponse{
-		Result: &chatproto.User{
-			Email: modelUser.Email,
-			Name:  modelUser.Name,
-		},
-	}
-
-	return registerRes, nil
-}
-
-func (s *Service) AddUserToRoom(ctx context.Context, req *chatproto.UserRoom) (*chatproto.Empty, error) {
+func (s *Service) AddUserToRoom(ctx context.Context, req *v1.UserRoom) (*v1.Empty, error) {
 	roomUser := UserRoom{
 		RoomKey:   req.RoomKey,
 		UUID:      req.UUID,
@@ -78,10 +56,10 @@ func (s *Service) AddUserToRoom(ctx context.Context, req *chatproto.UserRoom) (*
 		return nil, err
 	}
 
-	return &chatproto.Empty{}, nil
+	return &v1.Empty{}, nil
 }
 
-func (s *Service) CreateRoom(ctx context.Context, req *chatproto.Room) (*chatproto.Empty, error) {
+func (s *Service) CreateRoom(ctx context.Context, req *v1.Room) (*v1.Empty, error) {
 	now := time.Now()
 
 	modelRoom := Room{
@@ -96,10 +74,10 @@ func (s *Service) CreateRoom(ctx context.Context, req *chatproto.Room) (*chatpro
 		return nil, err
 	}
 
-	return &chatproto.Empty{}, nil
+	return &v1.Empty{}, nil
 }
 
-func (s *Service) CreateStreamMessage(connect *chatproto.StreamConnect, stream chatproto.ChatProto_CreateStreamMessageServer) error {
+func (s *Service) CreateStreamMessage(connect *v1.StreamConnect, stream v1.ChatProto_CreateStreamServer) error {
 	conn := &Connection{
 		stream:  stream,
 		id:      connect.GetName(),
@@ -107,41 +85,41 @@ func (s *Service) CreateStreamMessage(connect *chatproto.StreamConnect, stream c
 		active:  true,
 		error:   make(chan error),
 	}
-	n := 0
-	for _, x := range s.Connnection {
-		if x.id != connect.GetName() && x.roomKey != connect.GetRoomKey() {
-			s.Connnection[n] = x
-			n++
-		}
+	if _, ok := s.Connnection[connect.GetName()]; !ok {
+		s.Connnection[connect.GetName()] = conn
 	}
-	s.Connnection = s.Connnection[:n]
-
-	s.Connnection = append(s.Connnection, conn)
 
 	return <-conn.error
 
 }
 
-func (s *Service) SendMessage(ctx context.Context, req *chatproto.ContentMessage) (*chatproto.Empty, error) {
+func (s *Service) SharePoint(ctx context.Context, req *v1.Point) (*v1.Empty, error) {
 	syncWait := sync.WaitGroup{}
 	finish := make(chan int)
 
-	for _, conn := range s.Connnection {
+	users, err := s.Repository.GetUserInRoom(ctx, req.RoomKey)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, user := range users {
 		syncWait.Add(1)
-		go func(messageContent *chatproto.ContentMessage, conn *Connection) {
+		go func(point *v1.Point, user *UserRoom) {
 			defer syncWait.Done()
-			if conn.active {
-				if req.RoomKey == conn.roomKey {
-					err := conn.stream.Send(messageContent)
-					fmt.Printf("Send Message to: %v\n", conn.stream)
-					if err != nil {
-						fmt.Printf("Error while streaming: %v\n", err)
-						conn.active = false
-						conn.error <- err
-					}
+			content := &v1.ResponseStream{
+				IsMessage: false,
+				Message:   nil,
+				Point:     point,
+			}
+			if req.RoomKey == user.RoomKey {
+				err := s.Connnection[user.UserEmail].stream.Send(content)
+				if err != nil {
+					fmt.Printf("Error while streaming: %v\n", err)
+					s.Connnection[user.UserEmail].active = false
+					s.Connnection[user.UserEmail].error <- err
 				}
 			}
-		}(req, conn)
+		}(req, user)
 	}
 
 	go func() {
@@ -150,5 +128,43 @@ func (s *Service) SendMessage(ctx context.Context, req *chatproto.ContentMessage
 	}()
 
 	<-finish
-	return &chatproto.Empty{}, nil
+	return &v1.Empty{}, nil
+}
+
+func (s *Service) SendMessage(ctx context.Context, req *v1.ContentMessage) (*v1.Empty, error) {
+	syncWait := sync.WaitGroup{}
+	finish := make(chan int)
+
+	users, err := s.Repository.GetUserInRoom(ctx, req.RoomKey)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, user := range users {
+		syncWait.Add(1)
+		go func(messageContent *v1.ContentMessage, user *UserRoom) {
+			defer syncWait.Done()
+			content := &v1.ResponseStream{
+				IsMessage: true,
+				Message:   messageContent,
+				Point:     nil,
+			}
+			if req.RoomKey == user.RoomKey {
+				err := s.Connnection[user.UserEmail].stream.Send(content)
+				if err != nil {
+					fmt.Printf("Error while streaming: %v\n", err)
+					s.Connnection[user.UserEmail].active = false
+					s.Connnection[user.UserEmail].error <- err
+				}
+			}
+		}(req, user)
+	}
+
+	go func() {
+		syncWait.Wait()
+		close(finish)
+	}()
+
+	<-finish
+	return &v1.Empty{}, nil
 }

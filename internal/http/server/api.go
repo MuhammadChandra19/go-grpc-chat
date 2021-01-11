@@ -18,7 +18,7 @@ type Server struct{}
 var conf = config.GetConfiguration()
 
 func (as *Server) Serve() {
-	var chatConnections []*chatservice.Connection
+	var chatConnections map[string]*chatservice.Connection
 	pg := postgres.NewDatabase()
 	chatRepo := chatservice.NewRepository(pg)
 	s := grpc.NewServer()

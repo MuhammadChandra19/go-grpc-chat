@@ -31,7 +31,6 @@ type repository struct {
 }
 
 const (
-	statementInsertUser    = `INSERT INTO "user" (name, email) values (:name,:email)`
 	statementInsertRoom    = `INSERT INTO "room" (room_key, type, created_by, created_at) values (:room_key, :type, :created_by, :created_at)`
 	statementUserJoinRoom  = `INSERT INTO "user_room" (uuid, user_email, room_key) values (:uuid, :user_email, :room_key)`
 	statementGetUserInRoom = `SELECT * from "user_room" WHERE room_key = :room_key`
@@ -44,19 +43,9 @@ var (
 
 // RepositoryInterface interface for using chat repo
 type RepositoryInterface interface {
-	InsertUser(ctx context.Context, userModel User) error
 	InsertRoom(ctx context.Context, roomModel Room) error
 	JoinRoom(ctx context.Context, userRoomModel UserRoom) error
 	GetUserInRoom(ctx context.Context, roomKey string) ([]*UserRoom, error)
-}
-
-func (r *repository) InsertUser(ctx context.Context, userModel User) error {
-	err := r.db.Exec(ctx, statementInsertUser, userModel)
-	if err != nil {
-		log.Println("Error: Insert User, ", err)
-		return err
-	}
-	return nil
 }
 
 func (r *repository) InsertRoom(ctx context.Context, roomModel Room) error {
