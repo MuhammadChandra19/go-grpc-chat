@@ -1,0 +1,4 @@
+PROTOPATH := path/to/proto/file
+
+gen:
+	protoc --proto_path=$(PROTOPATH) $(PROTOPATH)/*.proto  --go_out=plugins=grpc:api/v1/
