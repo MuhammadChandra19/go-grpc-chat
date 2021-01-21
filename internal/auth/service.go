@@ -19,6 +19,11 @@ type JwtPayload struct {
 	user.User
 }
 
+// NewJWTManager returns a new JWT manager
+func NewJWTManager(secretKey string) *Service {
+	return &Service{secretKey}
+}
+
 // GenerateJwtToken generates and signs a new token for a user
 func (s *Service) GenerateJwtToken(payload *user.User, exp time.Duration) (*string, error) {
 	claims := JwtPayload{
