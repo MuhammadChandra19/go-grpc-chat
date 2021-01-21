@@ -1,28 +1,37 @@
 package server
 
 import (
-	"github.com/MuhammadChandra19/go-grpc-chat/config"
-	chatservice "github.com/MuhammadChandra19/go-grpc-chat/internal/chat"
-	chatservicepb "github.com/MuhammadChandra19/go-grpc-chat/internal/chat/chatproto"
-	"github.com/MuhammadChandra19/go-grpc-chat/internal/storage/postgres"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 	"log"
 	"net"
 	"os"
 	"os/signal"
+
+	v1 "github.com/MuhammadChandra19/go-grpc-chat/api/v1"
+	"github.com/MuhammadChandra19/go-grpc-chat/config"
+	"github.com/MuhammadChandra19/go-grpc-chat/internal/chat"
+	"github.com/MuhammadChandra19/go-grpc-chat/internal/storage/postgres"
+	"github.com/MuhammadChandra19/go-grpc-chat/internal/user"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 type Server struct{}
 
 var conf = config.GetConfiguration()
 
+// Serve grpc
 func (as *Server) Serve() {
-	var chatConnections map[string]*chatservice.Connection
+	var chatConnections map[string]*chat.Connection
 	pg := postgres.NewDatabase()
-	chatRepo := chatservice.NewRepository(pg)
+
+	chatRepo := chat.NewRepository(pg)
+	userRepo := user.NewRepository(pg)
+
 	s := grpc.NewServer()
-	chatservicepb.RegisterChatProtoServer(s, &chatservice.Service{Connnection: chatConnections, Repository: chatRepo})
+
+	v1.RegisterChatProtoServer(s, &chat.Service{Connnection: chatConnections, Repository: chatRepo})
+	v1.RegisterUserProtoServer(s, &user.Service{Repository: userRepo})
+
 	reflection.Register(s)
 
 	lis, err := net.Listen("tcp", ":"+conf.Port)

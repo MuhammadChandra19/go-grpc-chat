@@ -3,9 +3,10 @@ package chat
 import (
 	"context"
 	"fmt"
-	"github.com/MuhammadChandra19/go-grpc-chat/api/v1"
 	"sync"
 	"time"
+
+	v1 "github.com/MuhammadChandra19/go-grpc-chat/api/v1"
 )
 
 type Service struct {
@@ -77,7 +78,7 @@ func (s *Service) CreateRoom(ctx context.Context, req *v1.Room) (*v1.Empty, erro
 	return &v1.Empty{}, nil
 }
 
-func (s *Service) CreateStreamMessage(connect *v1.StreamConnect, stream v1.ChatProto_CreateStreamServer) error {
+func (s *Service) CreateStream(connect *v1.StreamConnect, stream v1.ChatProto_CreateStreamServer) error {
 	conn := &Connection{
 		stream:  stream,
 		id:      connect.GetName(),
