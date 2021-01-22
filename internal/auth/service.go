@@ -2,9 +2,8 @@ package auth
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/MuhammadChandra19/go-grpc-chat/internal/user"
+	v1 "github.com/MuhammadChandra19/go-grpc-chat/api/v1"
 	"github.com/dgrijalva/jwt-go"
 )
 
@@ -16,7 +15,7 @@ type Service struct {
 // JwtPayload payload for jwt token
 type JwtPayload struct {
 	jwt.StandardClaims
-	user.User
+	*v1.User
 }
 
 // NewJWTManager returns a new JWT manager
@@ -25,19 +24,16 @@ func NewJWTManager(secretKey string) *Service {
 }
 
 // GenerateJwtToken generates and signs a new token for a user
-func (s *Service) GenerateJwtToken(payload *user.User, exp time.Duration) (*string, error) {
+func (s *Service) GenerateJwtToken(payload *v1.User) (string, error) {
 	claims := JwtPayload{
 		StandardClaims: jwt.StandardClaims{
 			Issuer: "Kopdar",
 		},
-		User: *payload,
-	}
-	signedToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(s.tokenSecret))
-	if err != nil {
-		return nil, err
+		User: payload,
 	}
 
-	return &signedToken, nil
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(s.tokenSecret))
 }
 
 // Verify verifies the access token string and return a user claim if the token is valid

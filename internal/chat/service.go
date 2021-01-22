@@ -86,9 +86,8 @@ func (s *Service) CreateStream(connect *v1.StreamConnect, stream v1.ChatProto_Cr
 		active:  true,
 		error:   make(chan error),
 	}
-	if _, ok := s.Connnection[connect.GetName()]; !ok {
-		s.Connnection[connect.GetName()] = conn
-	}
+
+	s.Connnection[connect.GetName()] = conn
 
 	return <-conn.error
 

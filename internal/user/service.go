@@ -2,12 +2,17 @@ package user
 
 import (
 	"context"
-	"github.com/MuhammadChandra19/go-grpc-chat/api/v1"
+
+	v1 "github.com/MuhammadChandra19/go-grpc-chat/api/v1"
+	"github.com/MuhammadChandra19/go-grpc-chat/internal/auth"
 	"github.com/MuhammadChandra19/go-grpc-chat/internal/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Service struct {
 	Repository RepositoryInterface
+	jwtManager *auth.Service
 }
 
 var (
@@ -15,7 +20,7 @@ var (
 	ErrUserNotFound    = errors.N(errors.CodeNotFoundError, "data user tidak ditemukan")
 )
 
-func (s *Service) RegisterUser(ctx context.Context, req *v1.User) (*v1.RegisterResponse, error) {
+func (s *Service) RegisterUser(ctx context.Context, req *v1.User) (*v1.TokenResponse, error) {
 
 	_, err := s.Repository.getByEmail(ctx, req.Email)
 
@@ -34,11 +39,17 @@ func (s *Service) RegisterUser(ctx context.Context, req *v1.User) (*v1.RegisterR
 		return nil, err
 	}
 
-	return &v1.RegisterResponse{
-		Result: req,
+	token, err := s.jwtManager.GenerateJwtToken(req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "cannot generate access token")
+	}
+
+	return &v1.TokenResponse{
+		Token: token,
 	}, nil
 }
 
+// SearchUser ...
 func (s *Service) SearchUser(ctx context.Context, req *v1.SearchParams) (*v1.SearchResponse, error) {
 	users, err := s.Repository.getUserList(ctx, req.Query)
 	if err != nil {
@@ -57,16 +68,23 @@ func (s *Service) SearchUser(ctx context.Context, req *v1.SearchParams) (*v1.Sea
 	return &v1.SearchResponse{Users: result}, nil
 }
 
-func (s *Service) SignIn(ctx context.Context, req *v1.SignInRequest) (*v1.User, error) {
+// SignIn method
+func (s *Service) SignIn(ctx context.Context, req *v1.SignInRequest) (*v1.TokenResponse, error) {
 	user, err := s.Repository.getByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, err
 	}
 
-	return &v1.User{
-		Email:    user.Email,
+	resUser := &v1.User{
 		Username: user.Username,
 		Name:     user.Name,
+		Email:    user.Email,
 		Photourl: user.PhotoURL,
+	}
+
+	token, err := s.jwtManager.GenerateJwtToken(resUser)
+
+	return &v1.TokenResponse{
+		Token: token,
 	}, nil
 }
