@@ -53,7 +53,7 @@ func (as *Server) Serve() {
 	}
 
 	go func() {
-		log.Println("Starting Server 1...")
+		log.Println("Starting Server 1..." + conf.Port)
 		if err := s.Serve(lis); err != nil {
 			log.Fatalf("failed to serve: %v", err)
 		}

@@ -8,7 +8,7 @@ import (
 func main() {
 	// Start Migration
 	db := postgres.NewDatabase()
-	err := db.Migrate(true)
+	err := db.Migrate(false)
 	if err != nil {
 		// if you cant connect to db why bother
 		panic(err)

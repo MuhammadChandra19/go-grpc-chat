@@ -22,16 +22,20 @@ var (
 
 func (s *Service) RegisterUser(ctx context.Context, req *v1.User) (*v1.TokenResponse, error) {
 
-	_, err := s.Repository.getByEmail(ctx, req.Email)
-
+	filter := map[string]interface{}{
+		"email": req.Email,
+	}
+	_, err := s.Repository.GetOne(ctx, filter)
+	print(err)
 	if err == nil {
 		return nil, ErrAlreadyRegister
 	}
 
 	user := User{
-		Name:     req.GetName(),
-		Email:    req.GetEmail(),
-		PhotoURL: req.GetPhotourl(),
+		Name:     req.Name,
+		Email:    req.Email,
+		PhotoURL: req.Photourl,
+		Username: req.Username,
 	}
 
 	err = s.Repository.InsertUser(ctx, user)
@@ -39,7 +43,7 @@ func (s *Service) RegisterUser(ctx context.Context, req *v1.User) (*v1.TokenResp
 		return nil, err
 	}
 
-	token, err := s.jwtManager.GenerateJwtToken(req)
+	token, err := s.jwtManager.Generate(user)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "cannot generate access token")
 	}
@@ -70,19 +74,14 @@ func (s *Service) SearchUser(ctx context.Context, req *v1.SearchParams) (*v1.Sea
 
 // SignIn method
 func (s *Service) SignIn(ctx context.Context, req *v1.SignInRequest) (*v1.TokenResponse, error) {
-	user, err := s.Repository.getByEmail(ctx, req.Email)
+	filter := map[string]interface{}{
+		"email": req.Email,
+	}
+	user, err := s.Repository.GetOne(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
-
-	resUser := &v1.User{
-		Username: user.Username,
-		Name:     user.Name,
-		Email:    user.Email,
-		Photourl: user.PhotoURL,
-	}
-
-	token, err := s.jwtManager.GenerateJwtToken(resUser)
+	token, err := s.jwtManager.Generate(user)
 
 	return &v1.TokenResponse{
 		Token: token,

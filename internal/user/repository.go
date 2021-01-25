@@ -2,13 +2,14 @@ package user
 
 import (
 	"context"
+	"log"
+
 	"github.com/MuhammadChandra19/go-grpc-chat/internal/errors"
 	"github.com/MuhammadChandra19/go-grpc-chat/internal/storage"
-	"log"
 )
 
 type User struct {
-	Username string `json:username db:username`
+	Username string `json:"username" db:"username"`
 	Name     string `json:"name" db:"name"`
 	Email    string `json:"email" db:"email"`
 	PhotoURL string `json:"photoUrl" db:"photo_url"`
@@ -19,7 +20,8 @@ type repository struct {
 }
 
 const (
-	statementInsertUser     = `INSERT INTO "user" (name, email, photo_url) values (:name,:email,:photo_url)`
+	queryUser               = `SELECT email, username, name, photo_url FROM "user"`
+	statementInsertUser     = `INSERT INTO "user" (name, email, photo_url, username) values (:name,:email,:photo_url,:username)`
 	statementGetUserByEmail = `SELECT * FROM "user" where email = :email`
 	statementSearchUser     = `SELECT * FROM "user" where username like :username or name like :name`
 )
@@ -33,6 +35,7 @@ type RepositoryInterface interface {
 	InsertUser(ctx context.Context, userModel User) error
 	getByEmail(ctx context.Context, email string) (*User, error)
 	getUserList(ctx context.Context, query string) ([]*User, error)
+	GetOne(ctx context.Context, filter map[string]interface{}) (*User, error)
 }
 
 func (r *repository) InsertUser(ctx context.Context, userModel User) error {
@@ -42,6 +45,17 @@ func (r *repository) InsertUser(ctx context.Context, userModel User) error {
 		return err
 	}
 	return nil
+}
+
+func (r *repository) GetOne(ctx context.Context, filter map[string]interface{}) (*User, error) {
+	queryParams := r.db.GenerateQueryParams(queryUser, filter, nil)
+	response := User{}
+	err := r.db.Query(ctx, queryParams, filter, &response, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, nil
 }
 
 func (r *repository) getByEmail(ctx context.Context, email string) (*User, error) {
@@ -67,7 +81,7 @@ func (r *repository) getUserList(ctx context.Context, query string) ([]*User, er
 		"username": query,
 		"name":     query,
 	}
-	queryParams := r.db.GenerateQueryParams(statementSearchUser, nil, filter)
+	queryParams := r.db.GenerateQueryParams(queryUser, nil, filter)
 
 	err := r.db.Query(ctx, queryParams, filter, &response, false)
 	if err != nil {
